@@ -1,11 +1,17 @@
 package com.orientechnologies.proto;
 
 import com.google.protobuf.ByteString;
+import com.orientechnologies.orient.core.db.record.OIdentifiable;
+import com.orientechnologies.orient.core.exception.OSerializationException;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
+import com.orientechnologies.orient.core.metadata.schema.OProperty;
+import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
+import com.orientechnologies.orient.core.record.impl.ODocumentEntry;
 import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
+import com.orientechnologies.orient.core.serialization.OMemoryStream;
 import com.orientechnologies.orient.core.util.ODateHelper;
 
 import java.lang.reflect.Array;
@@ -18,89 +24,167 @@ import java.util.*;
  */
 public class PDocumentSerializer {
     private static final long      MILLISEC_PER_DAY = 86400000;
-    private static ProtoSerializer.Item toItem(Object iObj){
+    @SuppressWarnings("unchecked")
+    private static ProtoSerializer.Item toItem(Object iObj, OType type){
         ProtoSerializer.Item.Builder oItem = ProtoSerializer.Item.newBuilder();
-        if (iObj instanceof Boolean) {
-            oItem.setValBool((Boolean) iObj);
-        } else if (iObj instanceof Integer) {
-            oItem.setValInt((Integer) iObj);
-        } else if (iObj instanceof Short) {
-            oItem.setValShort((Short) iObj);
-        } else if (iObj instanceof Long) {
-            oItem.setValLong((Long) iObj);
-        } else if (iObj instanceof Float) {
-            oItem.setValFloat((Float) iObj);
-        } else if (iObj instanceof Double) {
-            oItem.setValDouble((Double) iObj);
-        } else if (iObj instanceof String) {
-            oItem.setValString(((String) iObj));
-        } else if (iObj instanceof Byte) {
-            oItem.setValByte(((Byte) iObj));
-        } else if (iObj instanceof byte[]) {
-            oItem.setValBytes(ByteString.copyFrom((byte[]) iObj));
-        } else if (iObj instanceof List) {
-            List<Object> iList = (List<Object>)iObj;
-            ProtoSerializer.List.Builder builder = ProtoSerializer.List.newBuilder();
-            for (Object o : iList) {
-                builder.addValues(toItem(o));
-            }
-            oItem.setValList(builder);
-        } else if (iObj instanceof Set) {
-            Set<Object> iList = (Set<Object>)iObj;
-            ProtoSerializer.Set.Builder builder = ProtoSerializer.Set.newBuilder();
-            for (Object o : iList) {
-                builder.addValues(toItem(o));
-            }
-            oItem.setValSet(builder);
-        } else if (iObj instanceof Map) {
-            Map<String,Object> iMap = (Map<String,Object>)iObj;
-            ProtoSerializer.Map.Builder builder = ProtoSerializer.Map.newBuilder();
-            Map<String, ProtoSerializer.Item> oMap = builder.getMutableValues();
-            for (Map.Entry<String, Object> kv : iMap.entrySet()) {
-                oMap.put(kv.getKey(), toItem(kv.getValue()));
-            }
-            oItem.setValMap(builder);
-        } else if (iObj instanceof ORID) {
-            ORID rid = (ORID)iObj;
-            ProtoSerializer.RID.Builder builder = ProtoSerializer.RID.newBuilder();
-            builder.setClusterId(rid.getClusterId());
-            builder.setClusterPos(rid.getClusterPosition());
-            oItem.setValRid(builder);
-        } else if (iObj instanceof ODocument) {
-            ODocument iDoc = (ODocument) iObj;
-            oItem.setValDocument(toPB(iDoc));
-        } else if (iObj instanceof Object[]) {
-            ProtoSerializer.List.Builder builder = ProtoSerializer.List.newBuilder();
-            for (Object o : (Object[]) iObj) {
-                builder.addValues(toItem(o));
-            }
-            oItem.setValList(builder);
-        } else if (iObj instanceof Date) {
-            oItem.setValDateTime(ProtoSerializer.DateTime.newBuilder().setValue(((Date) iObj).getTime()));
-        } else if (iObj instanceof BigDecimal) {
-            BigDecimal dec = (BigDecimal)iObj;
-            oItem.setValDecimal(ProtoSerializer.Decimal.newBuilder().setScale(dec.scale())
-                    .setValue(ByteString.copyFrom(dec.unscaledValue().toByteArray())));
-        } else if (iObj == null) {
-            // bypass
-        } else {
-            // TODO: throw some exception
+        if (type == null) {
+            return oItem.build(); // null value
+        }
+        switch (type) {
+            case BOOLEAN:
+                oItem.setValBool((Boolean) iObj);
+                break;
+            case INTEGER:
+                oItem.setValInt((Integer) iObj);
+                break;
+            case SHORT:
+                oItem.setValShort((Short) iObj);
+                break;
+            case LONG:
+                oItem.setValLong((Long) iObj);
+                break;
+            case FLOAT:
+                oItem.setValFloat((Float) iObj);
+                break;
+            case DOUBLE:
+                oItem.setValDouble((Double) iObj);
+                break;
+            case STRING:
+                oItem.setValString(((String) iObj));
+                break;
+            case BINARY:
+                oItem.setValBytes(ByteString.copyFrom((byte[]) iObj));
+                break;
+            case BYTE:
+                oItem.setValByte(((Byte) iObj));
+                break;
+            case LINKLIST:
+            case EMBEDDEDLIST:
+                ProtoSerializer.List.Builder listBuilder = ProtoSerializer.List.newBuilder();
+                if (iObj instanceof Object[]) {
+                    for (Object o : (Object[]) iObj) {
+                        listBuilder.addValues(toItem(o, getValueType(o)));
+                    }
+                } else {
+                    List<Object> iList = (List<Object>) iObj;
+                    for (Object o : iList) {
+                        listBuilder.addValues(toItem(o, getValueType(o)));
+                    }
+                }
+                oItem.setValList(listBuilder);
+                break;
+            case LINKSET:
+            case EMBEDDEDSET:
+                Set<Object> iSet = (Set<Object>)iObj;
+                ProtoSerializer.Set.Builder setBuilder = ProtoSerializer.Set.newBuilder();
+                for (Object o : iSet) {
+                    setBuilder.addValues(toItem(o, getValueType(o)));
+                }
+                oItem.setValSet(setBuilder);
+                break;
+            case LINKMAP:
+            case EMBEDDEDMAP:
+                Map<String,Object> iMap = (Map<String,Object>)iObj;
+                ProtoSerializer.Map.Builder mapBuilder = ProtoSerializer.Map.newBuilder();
+                Map<String, ProtoSerializer.Item> oMap = mapBuilder.getMutableValues();
+                for (Map.Entry<String, Object> kv : iMap.entrySet()) {
+                    oMap.put(kv.getKey(), toItem(kv.getValue(), getValueType(kv.getValue())));
+                }
+                oItem.setValMap(mapBuilder);
+                break;
+            case LINK:
+                ORID rid = ((OIdentifiable)iObj).getIdentity();
+                ProtoSerializer.RID.Builder ridBuilder = ProtoSerializer.RID.newBuilder();
+                ridBuilder.setClusterId(rid.getClusterId());
+                ridBuilder.setClusterPos(rid.getClusterPosition());
+                oItem.setValRid(ridBuilder);
+                break;
+            case EMBEDDED:
+                oItem.setValDocument(toPB((ODocument) iObj));
+                break;
+            case DATE:
+                long dateValue;
+                if (iObj instanceof Long) {
+                    dateValue = (Long)iObj;
+                } else {
+                    dateValue = ((Date) iObj).getTime();
+                }
+                int offset = ODateHelper.getDatabaseTimeZone().getOffset(dateValue);
+                oItem.setValDateTime(ProtoSerializer.DateTime.newBuilder().setValue((dateValue + offset) / MILLISEC_PER_DAY));
+                break;
+            case DATETIME:
+                long dtValue;
+                if (iObj instanceof Long) {
+                    dtValue = (Long)iObj;
+                } else {
+                    dtValue = ((Date) iObj).getTime();
+                }
+                oItem.setValDateTime(ProtoSerializer.DateTime.newBuilder().setValue(dtValue));
+                break;
+            case DECIMAL:
+                BigDecimal dec = (BigDecimal)iObj;
+                oItem.setValDecimal(ProtoSerializer.Decimal.newBuilder().setScale(dec.scale())
+                        .setValue(ByteString.copyFrom(dec.unscaledValue().toByteArray())));
+                break;
+            default:
+                throw new OSerializationException(
+                        "Impossible serialize value of type " + iObj + " with the ODocument binary serializer");
         }
         return oItem.build();
     }
-    private static ProtoSerializer.Document.Builder toPB(ODocument iDoc) {
+    private static ProtoSerializer.Document.Builder toPB(ODocument document) {
+        final OClass clazz = document.getSchemaClass();
+        final Map<String, OProperty> props = clazz != null ? clazz.propertiesMap() : null;
+
+        final Set<Map.Entry<String, ODocumentEntry>> fields = ODocumentInternal.rawEntries(document);
+
         ProtoSerializer.Document.Builder builder = ProtoSerializer.Document.newBuilder();
-        if (iDoc.getClassName() != null) {
-            builder.setClass_(iDoc.getClassName());
+        if (clazz != null) {
+            builder.setClass_(clazz.getName());
         }
-        Map<String,ProtoSerializer.Item> props = builder.getMutableFields();
-        for (Map.Entry<String, Object> f : iDoc) {
-            props.put(f.getKey(), toItem(f.getValue())); // TODO: check field type
+        Map<String,ProtoSerializer.Item> oFields = builder.getMutableFields();
+        for (Map.Entry<String, ODocumentEntry> entry : fields) {
+            ODocumentEntry docEntry = entry.getValue();
+            if (!docEntry.exist())
+                continue;
+
+            if (docEntry.property == null && props != null)
+                docEntry.property = props.get(entry.getKey());
+
+            final OType type = getFieldType(docEntry);
+
+            if (type == null && docEntry.value != null) {
+                throw new OSerializationException(
+                        "Impossible serialize value of type " + docEntry.value + " with the ODocument binary serializer");
+            }
+
+            oFields.put(entry.getKey(), toItem(docEntry.value, type));
         }
         return builder;
     }
     public static byte[] serialize(ODocument iDoc){
         return toPB(iDoc).build().toByteArray();
+    }
+    private static OType getValueType(Object o) {
+        if (o instanceof ODocument) {
+            return OType.EMBEDDED;
+        }
+        return OType.getTypeByValue(o);
+    }
+    private static OType getFieldType(final ODocumentEntry entry) {
+        OType type = entry.type;
+        if (type == null) {
+            final OProperty prop = entry.property;
+            if (prop != null)
+                type = prop.getType();
+
+        }
+        if (type == null || OType.ANY == type)
+            type = OType.getTypeByValue(entry.value);
+        return type;
+    }
+    public void serialize(final ODocument document, final OMemoryStream bytes) {
+        bytes.setAsFixed(toPB(document).build().toByteArray());
     }
     private static Object fromItem(ProtoSerializer.Item item) {
         switch (item.getValueCase()) {
@@ -161,7 +245,8 @@ public class PDocumentSerializer {
                 ProtoSerializer.Document iDoc = item.getValDocument();
                 return fromPB(iDoc);
         }
-        return null; // TODO: throw some exception
+        throw new OSerializationException(
+                "Unknown deserialize value of type " + item.getValueCase() + " with the ODocument binary serializer");
     }
     private static ODocument fromPB(ProtoSerializer.Document iDoc) {
         ODocument oDoc = new ODocument();//(iDoc.getClass_()); // TODO: why it fails on Link*?
