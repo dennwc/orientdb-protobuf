@@ -2,6 +2,18 @@ syntax = "proto3";
 
 package com.orientechnologies.proto;
 
+//ORecord instance
+message Record {
+    RID rid = 1;
+    int64 version = 2;
+
+    oneof data {
+        bytes raw = 3;
+        Document document = 4;
+    }
+}
+
+//additional attributes of ODocument instance
 message Document {
     string class = 1;
     map<string, Item> fields = 2;
@@ -9,31 +21,32 @@ message Document {
 
 message Item {
     oneof value {
-        bool     val_bool      = 1;
-        sint32   val_int       = 2;
-        sint32   val_short     = 3;
-        sint64   val_long      = 4;
-        float    val_float     = 5;
-        double   val_double    = 6;
-        DateTime val_date_time = 7;
-        string   val_string    = 8;
-        bytes    val_bytes     = 9;
-        Document val_document  = 10;
-        List     val_list      = 11;
-        Set      val_set       = 12;
-        Map      val_map       = 13;
-        RID      val_rid       = 14;
-        //reserved 15,16,17; // Link*
-        int32    val_byte      = 18;
-        //reserved 19; // Transient
-        Date     val_date      = 20;
-        //reserved 21; // Custom
-        Decimal  val_decimal   = 22;
-        //reserved 23; // LinkBag
-        //reserved 24; // Any
+        sint32   val_int          = 1; //com.orientechnologies.orient.core.metadata.schema.OType.INTEGER
+        double   val_double       = 2; //com.orientechnologies.orient.core.metadata.schema.OType.DOUBLE
+        string   val_string       = 3; //com.orientechnologies.orient.core.metadata.schema.OType.STRING
+        sint64   val_long         = 4; //com.orientechnologies.orient.core.metadata.schema.OType.LONG
+        Set      val_link_set     = 5; //com.orientechnologies.orient.core.metadata.schema.OType.LINKSET
+        RID      val_link         = 6; //com.orientechnologies.orient.core.metadata.schema.OType.LINK
+        Date     val_date         = 7; //com.orientechnologies.orient.core.metadata.schema.OType.DATE
+        DateTime val_date_time    = 8; //com.orientechnologies.orient.core.metadata.schema.OType.DATETIME
+        //reserved 9; // LinkBag
+        Record   val_record       = 10; //com.orientechnologies.orient.core.metadata.schema.OType.EMBEDDED
+        List     val_embded_list  = 11; //com.orientechnologies.orient.core.metadata.schema.OType.EMBEDDEDLIST
+        List     val_link_list    = 12; //com.orientechnologies.orient.core.metadata.schema.OType.LINKLIST
+        Set      val_embedded_set = 13; //com.orientechnologies.orient.core.metadata.schema.OType.EMBEDDEDSET
+        Map      val_embedded_map = 14; //com.orientechnologies.orient.core.metadata.schema.OType.EMBEDDEDMAP
+        Map      val_link_map     = 15; //com.orientechnologies.orient.core.metadata.schema.OType.LINKMAP
+        bytes    val_byte         = 16; //com.orientechnologies.orient.core.metadata.schema.OType.BYTE
+        bytes    val_bytes        = 17; //com.orientechnologies.orient.core.metadata.schema.OType.BINARY
+        bytes    val_custom       = 18; //com.orientechnologies.orient.core.metadata.schema.OType.CUSTOM
+        Decimal  val_decimal      = 19; //com.orientechnologies.orient.core.metadata.schema.OType.DECIMAL
+        sint32   val_short        = 20; //com.orientechnologies.orient.core.metadata.schema.OType.SHORT
+        float    val_float        = 21; //com.orientechnologies.orient.core.metadata.schema.OType.FLOAT
+        bool     val_bool         = 22; //com.orientechnologies.orient.core.metadata.schema.OType.BOOLEAN
     }
-    reserved 15,16,17,19,21,23,24;
+    reserved 9;
 }
+
 
 message List {
     repeated Item values = 1;
@@ -48,7 +61,7 @@ message Map {
 }
 
 message RID {
-    sint64 cluster_id  = 1;
+    sint32 cluster_id  = 1;
     sint64 cluster_pos = 2;
 }
 
