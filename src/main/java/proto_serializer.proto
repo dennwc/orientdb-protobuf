@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package com.orientechnologies.proto;
+
+message Document {
+    string class = 1;
+    map<string, Item> fields = 2;
+}
+
+message Item {
+    oneof value {
+        bool     val_bool      = 1;
+        sint32   val_int       = 2;
+        sint32   val_short     = 3;
+        sint64   val_long      = 4;
+        float    val_float     = 5;
+        double   val_double    = 6;
+        DateTime val_date_time = 7;
+        string   val_string    = 8;
+        bytes    val_bytes     = 9;
+        Document val_document  = 10;
+        List     val_list      = 11;
+        Set      val_set       = 12;
+        Map      val_map       = 13;
+        RID      val_rid       = 14;
+        //reserved 15,16,17; // Link*
+        int32    val_byte      = 18;
+        //reserved 19; // Transient
+        Date     val_date      = 20;
+        //reserved 21; // Custom
+        Decimal  val_decimal   = 22;
+        //reserved 23; // LinkBag
+        //reserved 24; // Any
+    }
+    reserved 15,16,17,19,21,23,24;
+}
+
+message List {
+    repeated Item values = 1;
+}
+
+message Set {
+    repeated Item values = 1;
+}
+
+message Map {
+    map<string,Item> values = 1;
+}
+
+message RID {
+    sint64 cluster_id  = 1;
+    sint64 cluster_pos = 2;
+}
+
+message DateTime {
+    int64 value = 1;
+}
+
+message Date {
+    int64 value = 1;
+}
+
+message Decimal {
+    int64 scale = 1;
+    bytes value = 2;
+}
