@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+import "types.proto";
+
+// AuthService is a root service for authentication
+service AuthService {
+    // OpenDatabase returns token, that can be used for DatabaseService
+    rpc OpenDatabase(DBAuthInfo) returns (Token);
+    // Connect returns token, that can be used for AdminService
+    rpc Connect(AuthInfo) returns (Token);
+    // Disconnect invalidates token from OpenDatabase or Connect
+    rpc Disconnect(Token) returns (Empty);
+}
+
+message AuthInfo {
+    string user = 1;
+    string pass = 2;
+}
+
+message DBAuthInfo {
+    string db_user = 1;
+    string db_pass = 2;
+    string db_name = 3;
+}
+
+message Token {
+    bytes token = 1;
+}

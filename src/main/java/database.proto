@@ -1,0 +1,200 @@
+syntax = "proto3";
+
+import "types.proto";
+import "proto_serializer.proto";
+
+service DatabaseService {
+    rpc Export(Empty) returns (stream DataChunk);
+    rpc Import(stream DataChunk) returns (Empty);
+    //rpc ImportRecords(stream Record) returns (Empty); // TODO: import records
+
+    rpc GetCluster(ClusterSelector) returns (Cluster);
+
+    rpc GetClass(ClassSelector) returns (Class);
+    rpc CreateClass(Class) returns (Empty);
+    rpc DeleteClass(ClassSelector) returns (Empty);
+    rpc DeleteProperty(PropertySelector) returns (Empty);
+    rpc CreateProperty(CreatePropertyRequest) returns (Empty);
+
+    rpc GetIndex(IndexSelector) returns (Index);
+    rpc DeleteIndex(IndexSelector) returns (Empty);
+    rpc UpdateIndex(UpdateIndexRequest) returns (Empty);
+
+    rpc GetDatabase(Empty) returns (Database);
+    rpc GetDictionary(DictionarySelector) returns (Record);
+    rpc GetLanguages(Empty) returns (Languages);
+
+    rpc GetClusterRecords(ClusterSelector)   returns (stream Record);
+    rpc GetIndexRecords(IndexRecordSelector) returns (stream Record); // TODO: GetIndex: is the signature correct?
+
+    rpc GetRecord(RecordSelector) returns (Record); // TODO: some reaction on fetch plan (stream TypedRecord?)
+    //rpc WatchRecord(RecordSelector) returns (stream Record); // TODO: proposal: watch for record changes (+ merge it with GetRecord)
+    rpc CreateRecord(Record) returns (Empty);
+    rpc DeleteRecord(RecordSelector) returns (Empty);
+    rpc UpdateRecord(UpdateRecordRequest) returns (Empty);
+
+    // Command executes one of following: Query, Script, Function and returns a stream of results (can be live).
+    rpc Command(CommandRequest) returns (stream TypedRecord);
+}
+
+// TypedRecord is used as a reaction to a fetch plan (can be cached instead of adding to result set).
+message TypedRecord{
+    Record record = 1; // the record itself
+    bool   cache  = 2; // if true, record is a part of fetch plan and may be cached by client
+}
+
+message UpdateIndexRequest{ // TODO: correct?
+    IndexSelector selector = 1;
+    Index  index = 2;
+    string key   = 3;
+    Record value = 4;
+}
+
+message UpdateRecordRequest{
+    RecordSelector selector = 1;
+    Record record  = 2;
+    bool   partial = 3;
+}
+
+message CreatePropertyRequest{
+    ClassSelector class    = 1;
+    Property      property = 2;
+}
+
+message PropertySelector{
+    ClassSelector class = 1;
+    string        name  = 2;
+}
+
+message Languages {
+    repeated string list = 1;
+}
+
+message CommandRequest {
+    message SQLQuery {
+        string text = 1; // query text
+        // TODO: params
+        repeated Item positional_params = 2;
+        map<string, Item> named_params  = 3;
+    }
+    message Script {
+        string lang    = 1; // script language
+        bytes  command = 2; // TODO: may be replaced with native command types
+        // TODO: params
+        repeated Item positional_params = 3;
+        map<string, Item> named_params  = 4;
+    }
+    message Function {
+        string        name   = 1;
+        repeated Item params = 2;
+    }
+    // TODO: actions too?
+
+    string fetch_plan = 1;
+    int64  limit      = 2;
+    bool   live       = 3;
+
+    oneof command {
+        SQLQuery query    = 10;
+        Script   script   = 11;
+        Function function = 12;
+    }
+}
+
+message IndexRecordSelector {
+    IndexSelector index = 1;
+    string key   = 2;
+    int64  limit = 3;
+}
+
+message RecordSelector {
+    RID     rid        = 1;
+    int64   version    = 2; // GetRecordIfVersionIsNotLatest or "delete if record has version"
+    strings fetch_plan = 3;
+    string  class      = 4; // optional, serves as a replacement for GetDocumentByClass
+}
+
+message DictionarySelector {
+    string key = 1;
+}
+
+message IndexSelector {
+    string name = 1;
+}
+
+message ClassSelector {
+    string name = 1;
+    // TODO: maybe some others? (like alias)
+}
+
+message ClusterSelector {
+    string name = 1;
+    int32  id   = 2;
+}
+
+message Property {
+    string              name         = 1;
+    string              linked_class = 2;
+    string              linked_type  = 3;
+    string              type         = 4; // TODO: enum?
+    bool                mandatory    = 5;
+    bool                readonly     = 6;
+    bool                not_null     = 7;
+    string              min_value    = 8;
+    string              max_value    = 9;
+    string              regexp       = 10;
+    string              collate      = 11;
+    map<string, string> custom       = 12;
+}
+
+message Class {
+    string              name              = 1;
+    repeated string     super             = 2;
+    string              alias             = 3;
+    bool                abstract          = 4;
+    bool                strict_mode       = 5;
+    repeated int32      clusters          = 6; // TODO: maybe a cluster selector?
+    int32               default_cluster   = 7;
+    string              cluster_selection = 8;
+    int64               record_count      = 9;
+    map<string, string> custom            = 10;
+    repeated Property   properties        = 11;
+    repeated Index      indexes           = 12;
+}
+
+message Cluster {
+    int32  id                = 1;
+    string name              = 2;
+    int64  records           = 3;
+    string conflict_strategy = 4;
+    // TODO: why these are disabled?
+    // size
+    // filled
+    // max_size
+    // files
+}
+
+message Index {
+    string          name          = 1;
+    string          type          = 2;
+    repeated string fields        = 3;
+    int64           size          = 4; // usually absent, because of the cost
+    Record          configuration = 5; // TODO: what is it? can we unfold it's definition?
+}
+
+message User {
+    string name = 1;
+}
+
+message Database {
+    message Config {
+        map<string, string> values     = 1; // TODO: maybe enumerate all the fields?
+        map<string, string> properties = 2; // TODO: any difference with previous?
+    }
+    ServerInfo       server       = 1;
+    User             current_user = 2;
+    Config           config       = 3;
+    repeated Class   classes      = 4;
+    repeated Cluster clusters     = 5;
+    repeated Index   indexes      = 6; // TODO: already in classes?
+}

@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+import "types.proto";
+import "database.proto";
+
+service AdminService {
+    rpc ListDatabases(Empty) returns (DatabaseList);
+    rpc GetDatabase(DatabaseSelector) returns (Database);
+    rpc CreateDatabase(CreateDatabaseRequest) returns (Empty);
+    rpc DeleteDatabase(DatabaseSelector) returns (Empty);
+    // TODO: detailed server info? (OServerCommandGetServer)
+    // TODO: change server info? (OServerCommandPostServer)
+    // TODO: InstallDatabase?
+    // TODO: KillConnections?
+}
+
+message DatabaseSelector{
+    string name = 1;
+}
+
+message CreateDatabaseRequest{
+    string name = 1;
+    string mode = 2;
+    string type = 3;
+}
+
+message DatabaseList {
+    map<string,string> list = 1;
+}

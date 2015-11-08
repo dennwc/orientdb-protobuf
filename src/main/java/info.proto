@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+import "types.proto";
+
+// InfoService is implemented by both AdminService and DatabaseService
+service InfoService {
+    rpc ServerInfo(Empty)  returns (ServerInfo);
+    rpc Connections(Empty) returns (Connections);
+}
+
+// ServerInfo is a version information about server and plaform/OS.
+message ServerInfo {
+    message OSInfo {        // OS version info
+        string name    = 1; // ex: Linux
+        string version = 2; // ex: 4.2
+        string arch    = 3; // ex: amd64
+    }
+    message PlatformInfo {  // Platform runtime info
+        string name    = 1; // ex: Java
+        string version = 2; // ex: 8.0
+        string vendor  = 3; // ex: Oracle
+    }
+    string version = 1;
+    string build   = 2;
+
+    OSInfo os = 3;
+    PlatformInfo platform = 4;
+}
+
+message Connections {
+    message Connection {
+        message Command {
+            string info           = 1;
+            string details        = 2;
+            Time   on             = 3;
+            int64  execution_time = 4;
+        }
+        message Driver {
+            string name             = 1;
+            string version          = 2;
+            int32  protocol_version = 3;
+        }
+        int64   id                 = 1;
+        string  remote_address     = 2;
+        string  db_name            = 3;
+        string  user_name          = 4;
+        int64   total_requests     = 5;
+        Command command            = 6;
+        Command last_command       = 7;
+        int64   total_working_time = 8;
+        Time    connected_on       = 9;
+        string  protocol           = 10;
+        string  client_id          = 11;
+        Driver  driver             = 12;
+    }
+    repeated Connection conns = 1;
+}

@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+// Empty is a fake request/response message with no data
+message Empty {}
+// DataChunk is a chunk of raw bytes. Used for streaming large data.
+message DataChunk { bytes data = 1; }
+// Time is a DateTime type. Potentially in different formats.
+message Time {
+    string text = 1; // TODO: in which format? maybe replace with UTC int?
+}
